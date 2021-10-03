@@ -65,6 +65,7 @@ class Beamsearch(object):
         Args:
             trans_probs: Probabilities of advancing from the previous step (batch_size, beam_size, num_nodes)
         """
+        #print(f'trans probs {trans_probs} {trans_probs.size()}')
         # Compound the previous scores (summing logits == multiplying probabilities)
         if len(self.prev_Ks) > 0:
             if self.probs_type == 'raw':
@@ -80,19 +81,30 @@ class Beamsearch(object):
                 beam_lk[:, 1:] = -1e20 * torch.ones(beam_lk[:, 1:].size()).type(self.dtypeFloat)
         # Multiply by mask
         beam_lk = beam_lk * self.mask
+        #print(f'beam_lk {beam_lk[0, 0, :]} {beam_lk.size()}')
         beam_lk = beam_lk.view(self.batch_size, -1)  # (batch_size, beam_size * num_nodes)
         # Get top k scores and indexes (k = beam_size)
         bestScores, bestScoresId = beam_lk.topk(self.beam_size, 1, True, True)
         # Update scores
         self.scores = bestScores
         # Update backpointers
-        prev_k = bestScoresId / self.num_nodes
+        #print(f'bestscoresid {bestScoresId} num nodes  {self.num_nodes}')
+        prev_k = bestScoresId // self.num_nodes
         self.prev_Ks.append(prev_k)
         # Update outputs
+        # some kind of error (new_nodes is just FP error)
         new_nodes = bestScoresId - prev_k * self.num_nodes
+        #new_nodes = bestScoresId
+        #print(f'new nodes {new_nodes} {new_nodes.size()}')
         self.next_nodes.append(new_nodes)
         # Re-index mask
-        perm_mask = prev_k.unsqueeze(2).expand_as(self.mask)  # (batch_size, beam_size, num_nodes)
+
+        #print(f'prev_k {prev_k}')
+        perm_mask = (prev_k).unsqueeze(2).expand_as(self.mask).to(torch.long)  # (batch_size, beam_size, num_nodes)
+        #print(f'mask {self.mask.size()} perm mask {perm_mask} {perm_mask.size()}')
+        torch.set_printoptions(threshold=100)
+        #print(perm_mask[0, :, 0])
+        #self.mask = self.mask.gather(2, perm_mask)
         self.mask = self.mask.gather(1, perm_mask)
         # Mask newly added nodes
         self.update_mask(new_nodes)

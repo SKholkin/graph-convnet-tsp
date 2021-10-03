@@ -6,6 +6,9 @@ from utils.beamsearch import *
 from utils.graph_utils import *
 
 
+def get_lr(optimizer):
+    return optimizer.param_groups[0]['lr']
+
 def loss_nodes(y_pred_nodes, y_nodes, node_cw):
     """
     Loss function for node predictions.
